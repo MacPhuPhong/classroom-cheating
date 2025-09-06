@@ -107,5 +107,3 @@ def detect_shoplifting(video_path):
 
 # Call the function with the video path
 detect_shoplifting(video_path)
-
-# thay dổi

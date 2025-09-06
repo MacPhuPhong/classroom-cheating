@@ -58,7 +58,6 @@ while cap.isOpened():
                 all_data.append(data)
                 cv2.imwrite(output_path, cropped_person)
                 a += 1
-
     i += 1
 
 print(f"Total frames processed: {i-1}, Total cropped images saved: {a-1}")
