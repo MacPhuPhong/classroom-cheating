@@ -1,0 +1,27 @@
+# Video files
+*.mp4
+
+# YOLO model weights
+*.pt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE / Editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+/note.text
+
+/dataset_path
