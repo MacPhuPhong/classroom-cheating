@@ -17,6 +17,4 @@ Phát hiện hành vi gian lận trong phòng thi bằng **YOLO Pose Estimation*
 ## 🚀 Run
 ```bash
 git clone https://github.com/<username>/classroom-cheating.git
-cd classroom-cheating
-pip install -r requirements.txt
-python Normal_1.py
+
