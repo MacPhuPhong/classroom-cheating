@@ -1,12 +1,12 @@
 import os 
 import cv2
-from  ultralytics import YOLO
+from ultralytics import YOLO
 import pandas as pd
 
-# yolo model
+# YOLO model
 model = YOLO("yolo11s-pose.pt")
 
-# video path 
+# Video path 
 cap = cv2.VideoCapture('vid_output.mp4')
 
 # Get video properties
@@ -28,10 +28,11 @@ while cap.isOpened():
         break
     # save full frame image
     pa = r'D:\git&github\classroom-cheating\dataset_path\images'
-    image_path = f'{pa}\img_{i}.jpg'
+    os.makedirs(pa, exist_ok=True)
+    image_path = os.path.join(pa, f'img_{i}.jpg')
     cv2.imwrite(image_path, frame)
     
-    #run yolo detection
+    # run yolo detection
     results = model(frame, verbose=False)
     
     for r in results:
@@ -43,8 +44,11 @@ while cap.isOpened():
             if conf[index] > 0.75:
                 x1, y1, x2, y2 = box.tolist()
                 cropped_person = frame[int(y1):int(y2), int(x1):int(x2)]
+                
+                # Chọn thư mục Normal để lưu
                 op = r'D:\git&github\classroom-cheating\dataset_path\Normal'
-                output_path = f'{op}\person_nn_{a}.jpg'
+                os.makedirs(op, exist_ok=True)
+                output_path = os.path.join(op, f'person_nn_{a}.jpg')
                 
                 data = {'image_name': f'person_nn_{a}.jpg'}
                 
@@ -52,6 +56,9 @@ while cap.isOpened():
                 for j in range(len(keypoints[index])):
                     data[f'x{j}'] = keypoints[index][j][0]
                     data[f'y{j}'] = keypoints[index][j][1]
+                
+                # Thêm label mặc định = Normal
+                data['label'] = 'Normal'
                 
                 all_data.append(data)
                 cv2.imwrite(output_path, cropped_person)
@@ -67,10 +74,10 @@ df = pd.DataFrame(all_data)
 
 csv_file_path = r'D:\git&github\classroom-cheating\dataset_path\normal_keypoint.csv'   
 
-
+# Lưu file, nếu đã tồn tại thì append
 if not os.path.isfile(csv_file_path):
     df.to_csv(csv_file_path, index=False)
 else:
     df.to_csv(csv_file_path, mode='a', header=False, index=False)
     
-print(f"Keypoint data saved to {csv_file_path}")
+print(f"Keypoint data with labels saved to {csv_file_path}")
