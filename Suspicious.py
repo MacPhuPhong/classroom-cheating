@@ -80,3 +80,6 @@ else:
     df.to_csv(csv_file_path, mode='a', header=False, index=False)  # Append if it exists
 
 print(f"Keypoint data saved to {csv_file_path}")
+
+#thay đổi
+
