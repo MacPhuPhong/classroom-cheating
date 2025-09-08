@@ -14,7 +14,9 @@ Phát hiện hành vi gian lận trong phòng thi bằng **YOLO Pose Estimation*
 - [Ultralytics YOLO](https://github.com/ultralytics/ultralytics)
 - Pandas
 
-## 🚀 Run
+## 🚀 Run 
 ```bash
 git clone https://github.com/<username>/classroom-cheating.git
+
+nice
 
