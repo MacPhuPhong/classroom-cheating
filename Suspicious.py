@@ -57,6 +57,9 @@ while cap.isOpened():
                     data[f'x{j}'] = keypoints[index][j][0]
                     data[f'y{j}'] = keypoints[index][j][1]
 
+                # Add label into csv
+                data['label'] = 'Suspicious'
+                
                 all_data.append(data)
                 cv2.imwrite(output_path, cropped_person)
                 a += 1  # Increment image number for the next person
