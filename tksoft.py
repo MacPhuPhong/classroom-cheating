@@ -120,7 +120,7 @@ class BlurApp:
         self.checkbuttons.clear()
         self.check_vars.clear()
 
-        self.capture = cv2.VideoCapture("vid3.mp4")
+        self.capture = cv2.VideoCapture("vid0.mp4")
         if not self.capture.isOpened():
             messagebox.showerror("Error", "Cannot open video file.")
             return

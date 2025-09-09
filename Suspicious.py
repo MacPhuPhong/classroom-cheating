@@ -57,7 +57,7 @@ while cap.isOpened():
                     data[f'x{j}'] = keypoints[index][j][0]
                     data[f'y{j}'] = keypoints[index][j][1]
                 
-                # add label for csv
+                # add label vào csv
                 data['label'] = 'Suspicious'
                 
                 all_data.append(data)
