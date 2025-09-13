@@ -25,3 +25,6 @@ Thumbs.db
 /note.text
 
 /dataset_path
+
+# file .txt
+*.txt
