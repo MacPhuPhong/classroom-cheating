@@ -48,4 +48,4 @@ accuracy = accuracy_score(y_test, y_pred)
 print(f"Accuracy: {accuracy:.4f}")
 
 # Save the trained model to a file
-model.save_model(r"D:\git&github\classroom-cheating\trained_model.json")
+model.save_model(r"/media/pphong/D:/git&github/classroom-cheating/trained_model.json")
