@@ -6,13 +6,14 @@ from tkinter import messagebox, Scrollbar
 from PIL import Image, ImageTk
 import threading
 
-model = YOLO("yolov8n.pt")
+# 🔹 Dùng model segmentation thay vì detection
+model = YOLO("yolov8n-seg.pt")
 names = model.model.names
 
 class BlurApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Track ID Blur Tool with Dual View")
+        self.root.title("Track ID Blur Tool (Segmentation Version)")
         self.root.geometry("1150x780")
         self.root.resizable(False, False)
 
@@ -36,7 +37,7 @@ class BlurApp:
         self.setup_ui()
 
     def setup_ui(self):
-        # === Frame for Both Video Views ===
+        # Frame hiển thị video gốc & video xử lý
         video_frame = tk.Frame(self.root)
         video_frame.pack(pady=5)
 
@@ -46,14 +47,13 @@ class BlurApp:
         self.video_label = tk.Label(video_frame, text="Blurred Frame")
         self.video_label.pack(side="left", padx=5)
 
-        # === Track ID Checkboxes ===
+        # Frame chứa danh sách Track ID
         track_id_frame = tk.Frame(self.root)
         track_id_frame.pack(padx=10, fill="x")
 
         canvas = tk.Canvas(track_id_frame, height=60)
         h_scroll = Scrollbar(track_id_frame, orient="horizontal", command=canvas.xview)
         canvas.configure(xscrollcommand=h_scroll.set)
-
         h_scroll.pack(side="bottom", fill="x")
         canvas.pack(side="top", fill="x")
 
@@ -61,10 +61,9 @@ class BlurApp:
         canvas.create_window((0, 0), window=self.track_id_inner, anchor="nw")
         self.track_id_inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
-        # === Control Buttons ===
+        # Các nút điều khiển
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(pady=10)
-
         tk.Button(btn_frame, text="Start", command=self.start_video).pack(side="left", padx=5)
         tk.Button(btn_frame, text="Pause", command=self.pause_video).pack(side="left", padx=5)
         tk.Button(btn_frame, text="Resume", command=self.resume_video).pack(side="left", padx=5)
@@ -120,7 +119,7 @@ class BlurApp:
         self.checkbuttons.clear()
         self.check_vars.clear()
 
-        self.capture = cv2.VideoCapture("vid0.mp4")
+        self.capture = cv2.VideoCapture("/media/pphong/D:/git&github/classroom-cheating/data_cheating/video1.mp4")
         if not self.capture.isOpened():
             messagebox.showerror("Error", "Cannot open video file.")
             return
@@ -129,7 +128,7 @@ class BlurApp:
         if self.fps <= 0:
             self.fps = 30
 
-        self.video_writer = cv2.VideoWriter("vid_output.mp4",
+        self.video_writer = cv2.VideoWriter("vid_output_seg.mp4",
                                             cv2.VideoWriter_fourcc(*"mp4v"),
                                             self.fps, (self.out_w, self.out_h))
 
@@ -151,23 +150,28 @@ class BlurApp:
                 frame = cv2.resize(frame, (self.out_w, self.out_h))
                 self.original_frame = frame.copy()
 
+                # Dùng model segmentation
                 results = model.track(frame, persist=True, classes=[0])
 
-                if results[0].boxes is not None and results[0].boxes.id is not None:
+                if results[0].masks is not None and results[0].boxes.id is not None:
+                    masks = results[0].masks.data.cpu().numpy()
                     boxes = results[0].boxes.xyxy.int().cpu().tolist()
                     class_ids = results[0].boxes.cls.int().cpu().tolist()
                     track_ids = results[0].boxes.id.int().cpu().tolist()
 
                     self.update_track_id_checkboxes(track_ids)
 
-                    for box, class_id, track_id in zip(boxes, class_ids, track_ids):
-                        x1, y1, x2, y2 = box
-                        roi = frame[y1:y2, x1:x2]
+                    # Lặp qua từng mask
+                    for mask, box, class_id, track_id in zip(masks, boxes, class_ids, track_ids):
+                        mask = cv2.resize(mask, (self.out_w, self.out_h))
+                        mask = (mask > 0.5).astype(np.uint8) * 255
 
                         if self.blur_mode and track_id in self.selected_ids:
-                            blur = cv2.blur(roi, (45, 45))
-                            frame[y1:y2, x1:x2] = blur
+                            # Làm mờ phần mask (theo pixel thật, không bounding box)
+                            blurred = cv2.blur(frame, (45, 45))
+                            frame = np.where(mask[..., None] == 255, blurred, frame)
                         else:
+                            x1, y1, x2, y2 = box
                             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                             cv2.putText(frame, f'ID:{track_id}', (x1, y2 + 15),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
