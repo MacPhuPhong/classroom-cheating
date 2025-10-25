@@ -68,7 +68,7 @@ def overlap_ratio(a,b):
     areaA=(x2-x1)*(y2-y1); areaB=(X2-X1)*(Y2-Y1)
     return inter/float(min(areaA,areaB))
 
-def detect_persons_in_box(color_box, frame, model, conf_thres=0.7):
+def detect_persons_in_box(color_box, frame, model, conf_thres=0.8):
     """Chạy YOLO trên vùng khung để tìm người và keypoints."""
     x1,y1,x2,y2 = map(int, shrink_box(color_box,6))
     crop = frame[y1:y2, x1:x2]
@@ -81,22 +81,31 @@ def detect_persons_in_box(color_box, frame, model, conf_thres=0.7):
 
     if r.boxes is not None and len(r.boxes) > 0:
         for i, (b, conf, cls) in enumerate(zip(r.boxes.xyxy, r.boxes.conf, r.boxes.cls)):
-            if conf < conf_thres:
-                continue
-            if int(cls) != 0:  # chỉ giữ class "person"
+            if conf < conf_thres or int(cls) != 0:
                 continue
             bx1,by1,bx2,by2 = map(int, b.tolist())
-            if (bx2-bx1)<20 or (by2-by1)<40:
+            w, h = bx2 - bx1, by2 - by1
+            aspect_ratio = h / (w + 1e-6)
+
+            # --- Lọc khung không hợp lý ---
+            if w < 30 or h < 60:
+                continue
+            if not 1.2 < aspect_ratio < 4.5:
                 continue
 
-            # Map to full frame coordinates
-            full_box = (bx1+x1, by1+y1, bx2+x1, by2+y1)
             # Lấy keypoints
             try:
                 keypoints = r.keypoints.xy[i].cpu().numpy().tolist()
             except Exception:
                 keypoints = []
-            persons.append((full_box, keypoints))
+            valid_kp = [kp for kp in keypoints if len(kp) == 2 and kp[0] > 0 and kp[1] > 0]
+            if len(valid_kp) < 5:
+                continue
+
+            # Map to full frame coordinates
+            full_box = (bx1+x1, by1+y1, bx2+x1, by2+y1)
+            persons.append((full_box, valid_kp))
+
     return persons
 
 # ===============================
@@ -128,6 +137,14 @@ while True:
     for gb in green_boxes:
         for (box, kp) in detect_persons_in_box(gb, frame, model):
             persons.append(("Normal", box, kp))
+
+    # --- Lọc trùng (overlap > 0.7) ---
+    filtered = []
+    for label, box, kp in persons:
+        if any(overlap_ratio(box, b) > 0.7 for _, b, _ in filtered):
+            continue
+        filtered.append((label, box, kp))
+    persons = filtered
 
     for label, box, kps in persons:
         x1,y1,x2,y2 = map(int, box)
