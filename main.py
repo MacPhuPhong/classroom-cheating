@@ -6,104 +6,104 @@ import xgboost as xgb
 import numpy as np
 import cvzone
 
-# Lấy đường dẫn tuyệt đối tới file vid2.mp4
-video_path = os.path.join(os.path.dirname(__file__), "vid2.mp4")
+VIDEO_PATH = r"/media/pphong/D:/git&github/classroom-cheating/data_cheating/video3.mp4"
+MODEL_YOLO_PATH = "yolo11n.pt"
+MODEL_XGB_PATH = r"/media/pphong/D:/git&github/classroom-cheating/trained_model.json"
 
-def detect_shoplifting(video_path):
-    # Load YOLOv8 model (replace with the actual path to your YOLOv8 model)
-    model_yolo = YOLO('yolo11n-pose.pt')
+CONF_THRESHOLD = 0.55
+SUSPICIOUS_THRESHOLD = 0.35
+DEBUG_SAVE_DIR = "debug_failed_preds"
+os.makedirs(DEBUG_SAVE_DIR, exist_ok=True)
 
-    # Load the trained XGBoost model (replace with the actual path to your XGBoost model)
+def prepare_features_from_kp(kp_xy, trained_features):
+    data = {}
+    for j, (x, y) in enumerate(kp_xy):
+        data[f"x{j}"] = float(x)
+        data[f"y{j}"] = float(y)
+    df = pd.DataFrame([data])
+    df = df.reindex(columns=trained_features, fill_value=0)
+    return df
+
+def detect_suspicious_behavior(video_path):
+    print(" Loading YOLO pose model...")
+    model_yolo = YOLO(MODEL_YOLO_PATH)
+
+    print(" Loading XGBoost model...")
     model = xgb.Booster()
-    model.load_model(r"D:\git&github\classroom-cheating\trained_model.json")
+    model.load_model(MODEL_XGB_PATH)
+    trained_features = model.feature_names
+    print(f" XGBoost loaded with {len(trained_features)} features")
 
-    # Open the video
     cap = cv2.VideoCapture(video_path)
-
     if not cap.isOpened():
-        print("Error: Could not open video.")
+        print(" Cannot open video file.")
         return
 
-    print(f"Total Frames: {cap.get(cv2.CAP_PROP_FRAME_COUNT)}")
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f" Total frames: {total_frames}")
 
-    # Get video properties
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    frame_tot = 0
-    count = 0
+    frame_idx = 0
 
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
-            print("Warning: Frame could not be read. Skipping.")
-            break  # Stop the loop if no frame is read
-
-        count += 1
-        if count % 2 != 0:
+            break
+        frame_idx += 1
+        if frame_idx % 2 != 0:
             continue
 
-        # Resize the frame
         frame = cv2.resize(frame, (1018, 600))
-
-        # Run YOLOv8 on the frame
         results = model_yolo(frame, verbose=False)
-
-        # Visualize the YOLO results on the frame
         annotated_frame = results[0].plot(boxes=False)
 
         for r in results:
-            bound_box = r.boxes.xyxy  # Bounding box coordinates
-            conf = r.boxes.conf.tolist()  # Confidence levels
-            keypoints = r.keypoints.xyn.tolist()  # Keypoints for human pose
+            boxes = r.boxes.xyxy.cpu().numpy() if r.boxes.xyxy is not None else []
+            confs = r.boxes.conf.cpu().numpy().tolist() if r.boxes.conf is not None else []
+            keypoints = r.keypoints.xyn.cpu().numpy().tolist() if r.keypoints is not None else []
 
-            print(f'Frame {frame_tot}: Detected {len(bound_box)} bounding boxes')
+            for idx, box in enumerate(boxes):
+                if idx >= len(confs) or idx >= len(keypoints):
+                    continue
+                if confs[idx] < CONF_THRESHOLD:
+                    continue
 
-            for index, box in enumerate(bound_box):
-                if conf[index] > 0.55:  # Threshold for confidence score
-                    x1, y1, x2, y2 = box.tolist()
+                x1, y1, x2, y2 = map(int, box)
+                kp = keypoints[idx]
 
-                    # Prepare data for XGBoost prediction
-                    data = {}
-                    for j in range(len(keypoints[index])):
-                        data[f'x{j}'] = keypoints[index][j][0]
-                        data[f'y{j}'] = keypoints[index][j][1]
+                df = prepare_features_from_kp(kp, trained_features)
+                dmatrix = xgb.DMatrix(df)
 
-                    # Convert the data to a DataFrame
-                    df = pd.DataFrame(data, index=[0])
+                pred_prob = float(model.predict(dmatrix)[0])
 
-                    # Prepare data for XGBoost prediction
-                    dmatrix = xgb.DMatrix(df)
+                #  IN KIỂM TRA XÁC SUẤT
+                print(f"Frame {frame_idx}: prob={pred_prob:.3f}")
 
-                    # Make prediction using the XGBoost model
-                    sus = model.predict(dmatrix)
-                    binary_predictions = (sus > 0.5).astype(int)
-                    print(f'Prediction: {binary_predictions}')
+                #  ĐẢO LOGIC HIỂN THỊ CHO CHẮC
+                # Giả sử pred_prob là "xác suất Suspicious"
+                pred_label = 1 if pred_prob >= SUSPICIOUS_THRESHOLD else 0
 
-                    # Annotate the frame based on prediction (0 = Suspicious, 1 = Normal)
-                    if binary_predictions == 0:  # Suspicious
-                        cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-                        cvzone.putTextRect(annotated_frame,f"{'Suspicious'}",(int(x1),(int(y1))),1,1)      
+                if pred_label == 1:
+                    color = (0, 0, 255)  #  Suspicious
+                    label_text = f"Suspicious ({pred_prob:.2f})"
+                else:
+                    color = (0, 255, 0)  #  Normal
+                    label_text = f"Normal ({pred_prob:.2f})"
 
-                    else:  # Normal
-                        cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                        cvzone.putTextRect(annotated_frame,f"{'Normal'}",(int(x1),(int(y1) +50)),1,1)      
-        # Show the annotated frame in a window
-        cv2.imshow('Frame', annotated_frame)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                cvzone.putTextRect(
+                    annotated_frame, label_text,
+                    (x1, max(0, y1 - 10)), scale=1, thickness=1, colorR=color
+                )
 
-       
+                if pred_label == 1 and pred_prob > 0.7:
+                    debug_path = os.path.join(DEBUG_SAVE_DIR, f"frame{frame_idx}_p{idx}_prob{pred_prob:.2f}.jpg")
+                    cv2.imwrite(debug_path, annotated_frame)
 
-        # Press 'q' to stop the video early
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        cv2.imshow("Detection", annotated_frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # Release resources
     cap.release()
-    
-
-    # Close all OpenCV windows after processing is complete
     cv2.destroyAllWindows()
 
-# Call the function with the video path
-detect_shoplifting(video_path)
+detect_suspicious_behavior(VIDEO_PATH)
