@@ -77,7 +77,7 @@ YOLO-Pose độc lập từng frame → dữ liệu có thể tráo người.
 
 ### ✅ Giải pháp
 - So sánh IoU giữa box ở frame t và t+1  
-- IoU ≥ 0.5 → cùng một người  
+- IoU ≥ 0.35 → cùng một người  
 - Gán ID cố định xuyên suốt video  
 
 ### 🎉 Kết quả
@@ -107,9 +107,9 @@ Person_2: frame001 → frame120
 
 | Loại | Số lượng |
 |------|---------|
-| Cheating | 10,277 |
-| Non-cheating | 35,258 |
-| **Tổng** | **45,535** |
+| Cheating | Non |
+| Non-cheating | Non |
+| **Tổng** | **Non** |
 
 ### 📌 Train/Test Split
 - 80% training  
