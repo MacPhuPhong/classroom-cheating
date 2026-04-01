@@ -29,5 +29,11 @@ Thumbs.db
 # file .txt
 *.txt
 
-
 Suspicious.py
+
+# Bỏ qua các thư mục dữ liệu, video và kết quả
+datavideo/
+models/
+out_b*/
+out_b6/figures/
+
